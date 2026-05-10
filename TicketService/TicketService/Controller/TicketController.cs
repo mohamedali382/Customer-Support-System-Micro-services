@@ -27,7 +27,7 @@ namespace TicketService.Controller
             var createdTicket = await _ticketService.CreateTicketAsync(userId, ticketDto);
             return Ok(createdTicket);
         }
-        [Authorize(Roles = "Agent")]
+        //[Authorize(Roles = "Agent")]
         [HttpPatch("{id}/status")]
         public async Task<IActionResult> UpdateStatus(int id, [FromBody] UpdateStatusDto dto)
         {
@@ -36,7 +36,7 @@ namespace TicketService.Controller
                 return NotFound();
             return Ok(result);
         }
-        [Authorize(Roles = "Admin")]
+        //[Authorize(Roles = "Admin")]
         [HttpPatch("{id}/assign")]
         public async Task<IActionResult> AssignTicket(int id, [FromBody] AssignTicketDto dto)
         {
@@ -50,15 +50,19 @@ namespace TicketService.Controller
         [HttpGet("{id}")]
         public async Task<IActionResult> GetTicketById(int id)
         {
-            var userId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+        var userId  = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+        var isAdmin = User.IsInRole("Admin");
 
-            if (string.IsNullOrEmpty(userId))
-                return Unauthorized();
+        if (string.IsNullOrEmpty(userId))
+            return Unauthorized();
 
-            var ticket = await _ticketService.GetTicketByIdAsync(id, userId);
+        var ticket = await _ticketService.GetTicketByIdAsync(id);
+        if (ticket == null)
+            return NotFound();
 
-            if (ticket == null)
-                return NotFound();
+
+        if (!isAdmin && ticket.UserId != userId)
+            return Forbid();
 
             return Ok(ticket);
         }

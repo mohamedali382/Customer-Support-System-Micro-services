@@ -5,7 +5,7 @@
         public int Id { get; set; }
 
         public string UserId { get; set; }
-        public int? AssignedAgentId { get; set; }
+        public string? AssignedAgentId { get; set; }
         public string? AssignedAgentName { get; set; }
         public string Title { get; set; }
         public string Description { get; set; }

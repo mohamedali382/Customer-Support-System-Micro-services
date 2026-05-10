@@ -1,7 +1,9 @@
 ﻿namespace SupportService.DTOs.AssignmentDTOs
 {
-    public record ResolveAssignmentRequest(
-        int TicketId,
-        string ResolvedBy
-    );
+    public class ResolveAssignmentRequest
+    {
+        public int TicketId { get; set; }
+        public string? AgentId { get; set; }
+
+    }
 }

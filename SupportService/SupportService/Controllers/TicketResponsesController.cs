@@ -1,4 +1,6 @@
-﻿using Microsoft.AspNetCore.Mvc;
+﻿using System.Security.Claims;
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc;
 using SupportService.DTOs;
 using SupportService.Services.Interfaces;
 
@@ -6,6 +8,7 @@ namespace SupportService.Controllers
 {
     [ApiController]
     [Route("api/ticket-responses")]
+    //[Authorize]
     public class TicketResponsesController : ControllerBase
     {
         private readonly ITicketResponseService _responseService;
@@ -13,16 +16,25 @@ namespace SupportService.Controllers
         public TicketResponsesController(ITicketResponseService responseService)
             => _responseService = responseService;
 
-        /// <summary>Add an agent response to a ticket</summary>
         [HttpPost]
+        //[Authorize(Roles = "Agent,Admin")] 
         public async Task<IActionResult> AddResponse([FromBody] AddTicketResponseRequest request)
         {
-            if (string.IsNullOrEmpty(request.Content))
+            if (string.IsNullOrWhiteSpace(request.Content))
                 return BadRequest(new { message = "Content is required." });
+
+            //var agentId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+            //var agentName = User.FindFirst(ClaimTypes.Name)?.Value;
+
+            //if (string.IsNullOrEmpty(agentId))
+            //    return Unauthorized();
 
             try
             {
-                var response = await _responseService.AddResponseAsync(request);
+                var response = await _responseService.AddResponseAsync(
+                    request
+                );
+
                 return Ok(response);
             }
             catch (KeyNotFoundException ex)
@@ -30,10 +42,12 @@ namespace SupportService.Controllers
                 return NotFound(new { message = ex.Message });
             }
         }
-
-        /// <summary>Get all responses for a ticket</summary>
         [HttpGet("ticket/{ticketId:int}")]
+        //[Authorize]
         public async Task<IActionResult> GetByTicket(int ticketId)
-            => Ok(await _responseService.GetResponsesByTicketAsync(ticketId));
+        {
+            var responses = await _responseService.GetResponsesByTicketAsync(ticketId);
+            return Ok(responses);
+        }
     }
 }

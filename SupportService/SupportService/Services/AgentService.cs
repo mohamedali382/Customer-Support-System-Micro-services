@@ -10,12 +10,14 @@ namespace SupportService.Services
     {
         private readonly SupportDbContext _context;
         private readonly ILogger<AgentService> _logger;
+        private readonly IdentityServiceClient _identityClient;
 
         public AgentService(SupportDbContext context,
-            ILogger<AgentService> logger)
+            ILogger<AgentService> logger, IdentityServiceClient identityClient)
         {
             _context = context;
             _logger = logger;
+            _identityClient = identityClient;
         }
 
         public async Task<AgentListResponse> GetAllAsync(string? status)
@@ -29,11 +31,12 @@ namespace SupportService.Services
             return new AgentListResponse(agents.Select(MapAgent).ToList(), agents.Count);
         }
 
-        public async Task<AgentResponse?> GetByIdAsync(int id)
+        public async Task<AgentResponse?> GetByIdAsync(string id)
         {
             var agent = await _context.Agents.FindAsync(id);
             return agent is null ? null : MapAgent(agent);
         }
+
 
         public async Task<AgentResponse> CreateAsync(CreateAgentRequest request)
         {
@@ -51,14 +54,31 @@ namespace SupportService.Services
                 UpdatedAt = DateTime.UtcNow
             };
 
+            try
+            {
+                await _identityClient.CreateAgentAccountAsync(new CreateIdentityAgentRequest
+                {
+                    FullName = request.Name,
+                    Email = request.Email,
+                    Password = request.Password,
+                    PhoneNumber = request.PhoneNumber,
+                    Role = "Agent"
+                });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Failed to create Identity account for {Email}", request.Email);
+                throw;
+            }
+
             _context.Agents.Add(agent);
             await _context.SaveChangesAsync();
-            _logger.LogInformation("Agent #{Id} created: {Name}", agent.Id, agent.Name);
 
+            _logger.LogInformation("Agent #{Id} created: {Name}", agent.Id, agent.Name);
             return MapAgent(agent);
         }
 
-        public async Task<AgentResponse?> UpdateAsync(int id, UpdateAgentRequest request)
+        public async Task<AgentResponse?> UpdateAsync(string id, UpdateAgentRequest request)
         {
             var agent = await _context.Agents.FindAsync(id);
             if (agent is null) return null;
@@ -79,7 +99,7 @@ namespace SupportService.Services
             return MapAgent(agent);
         }
 
-        public async Task<bool> DeleteAsync(int id)
+        public async Task<bool> DeleteAsync(string id)
         {
             var agent = await _context.Agents.FindAsync(id);
             if (agent is null) return false;

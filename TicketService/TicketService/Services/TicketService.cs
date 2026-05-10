@@ -45,9 +45,9 @@ namespace TicketService.Services
                     TicketId = ticket.Id,
                     UserId = userId,
                     Title = ticket.Title,
-                    Status = ticket.Status,
                     Description = ticket.Description,
-                    CreatedAt = ticket.Created
+                    CreatedAt = ticket.Created,
+                    EventType = EventType.TicketCreated
                 });
 
                 return new TicketDto
@@ -64,9 +64,9 @@ namespace TicketService.Services
             
         }
 
-        public async Task<TicketDtoResponse?> GetTicketByIdAsync(int id, string userId)
+        public async Task<TicketDtoResponse?> GetTicketByIdAsync(int id)
         {
-            var ticket = await _context.Tickets.FirstOrDefaultAsync(t =>t.Id == id && t.UserId == userId);
+            var ticket = await _context.Tickets.FirstOrDefaultAsync(t =>t.Id == id);
 
             if (ticket == null)
                 return null;
@@ -74,6 +74,7 @@ namespace TicketService.Services
             return new TicketDtoResponse
             {
                 Id = ticket.Id.ToString(),
+                UserId = ticket.UserId,
                 Title = ticket.Title,
                 Description = ticket.Description,
                 Created = ticket.Created,
@@ -88,7 +89,7 @@ namespace TicketService.Services
 
             if (ticket == null)
                 return false;
-
+            var PrevStatus = ticket.Status;
             ticket.Status = status;
             ticket.Updated = DateTime.UtcNow;
 
@@ -97,7 +98,7 @@ namespace TicketService.Services
             return true;
         }
 
-        public async Task<bool> AssignTicketAsync(int ticketId, int agentId, string agentName, string priority)
+        public async Task<bool> AssignTicketAsync(int ticketId, string agentId, string agentName, string priority)
         {
             var ticket = await _context.Tickets.FindAsync(ticketId);
 

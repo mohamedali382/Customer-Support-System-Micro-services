@@ -1,4 +1,5 @@
-﻿using Microsoft.AspNetCore.Connections;
+﻿using Contracts;
+using Microsoft.AspNetCore.Connections;
 using RabbitMQ.Client;
 using System.Text;
 using System.Text.Json;
@@ -63,14 +64,14 @@ public class RabbitMQPublisher : IAsyncDisposable
                 _connection = await factory.CreateConnectionAsync();
                 _channel = await _connection.CreateChannelAsync();
 
-                await _channel.QueueDeclareAsync(
-                    queue: _config["RabbitMQ:Queue"] ?? "Ticket_queue",
-                    durable: true,
-                    exclusive: false,
-                    autoDelete: false,
-                    arguments: null);
+                // ✅ Declare exchange only — no queue declaration in publisher
+                var exchange = _config["RabbitMQ:Exchange"] ?? "ticket.events";
+                await _channel.ExchangeDeclareAsync(
+                    exchange: exchange,
+                    type: ExchangeType.Fanout,
+                    durable: true);
 
-                _logger.LogInformation("✅ SupportService connected to RabbitMQ.");
+                _logger.LogInformation("✅ SupportService publisher connected to RabbitMQ.");
                 return;
             }
             catch (Exception ex)
@@ -84,24 +85,57 @@ public class RabbitMQPublisher : IAsyncDisposable
         }
     }
 
-    public async Task PublishAsync(SupportEvent supportEvent)
+    public async Task PublishAssignmentInfoAsync(TicketAssignedEvent assignedEvent)
+    {
+        if (_channel is null)
+            throw new InvalidOperationException("Publisher not initialized.");
+
+        var exchange = _config["RabbitMQ:Exchange"] ?? "ticket.events";
+        var body = Encoding.UTF8.GetBytes(JsonSerializer.Serialize(assignedEvent));
+
+        // ✅ publish to exchange
+        await _channel.BasicPublishAsync(
+            exchange: exchange,
+            routingKey: "",
+            body: body);
+    }
+
+    public async Task PublishStatusChangeAsync(TicketStatusChangedEvent statusEvent)
+    {
+        if (_channel is null)
+            throw new InvalidOperationException("Publisher not initialized.");
+
+        var exchange = _config["RabbitMQ:Exchange"] ?? "ticket.events";
+        var body = Encoding.UTF8.GetBytes(JsonSerializer.Serialize(statusEvent));
+
+        // ✅ publish to exchange
+        await _channel.BasicPublishAsync(
+            exchange: exchange,
+            routingKey: "",
+            body: body);
+    }
+
+    public async Task PublishTicketCommentAsync(TicketCommentAddedEvent commentEvent)
     {
         if (_channel is null)
         {
             _logger.LogWarning("⚠️ RabbitMQ channel not available. Event not published.");
             return;
         }
+
         try
         {
-            var queue = _config["RabbitMQ:Queue"] ?? "support_queue";
-            var body = Encoding.UTF8.GetBytes(JsonSerializer.Serialize(supportEvent, _jsonOptions));
-            await _channel.BasicPublishAsync(exchange: "", routingKey: queue, body: body);
-            _logger.LogInformation("✅ Published: {EventType} | Agent #{AgentId}",
-                supportEvent.EventType, supportEvent.AgentId);
+            var exchange = _config["RabbitMQ:Exchange"] ?? "ticket.events"; // ✅ use exchange
+            var body = Encoding.UTF8.GetBytes(JsonSerializer.Serialize(commentEvent, _jsonOptions));
+
+            await _channel.BasicPublishAsync(
+                exchange: exchange,   // ✅ fixed: was publishing to queue directly
+                routingKey: "",
+                body: body);
         }
         catch (Exception ex)
         {
-            _logger.LogWarning(ex, "⚠️ Failed to publish event.");
+            _logger.LogWarning(ex, "⚠️ Failed to publish comment event.");
         }
     }
 

@@ -30,12 +30,13 @@ public class RabbitMQPublisher : IAsyncDisposable
         _connection = await factory.CreateConnectionAsync();
         _channel = await _connection.CreateChannelAsync();
 
-        var queue = _config["RabbitMQ:Queue"] ?? "Ticket_queue";
-        await _channel.QueueDeclareAsync(queue,
-            durable: true,      // survive broker restart
-            exclusive: false,
-            autoDelete: false,
-            arguments: null);
+        var exchange = _config["RabbitMQ:Exchange"] ?? "ticket.events";
+
+        // Only declare the exchange
+        await _channel.ExchangeDeclareAsync(
+            exchange: exchange,
+            type: ExchangeType.Fanout,
+            durable: true);
     }
 
     public async Task PublishTicketCreatedAsync(TicketCreatedEvent ticketEvent)
@@ -43,14 +44,39 @@ public class RabbitMQPublisher : IAsyncDisposable
         if (_channel is null)
             throw new InvalidOperationException("Publisher not initialized. Call InitializeAsync first.");
 
-        var queue = _config["RabbitMQ:Queue"] ?? "ticket_queue";
+        var exchange = _config["RabbitMQ:Exchange"] ?? "ticket.events";
         var body = Encoding.UTF8.GetBytes(JsonSerializer.Serialize(ticketEvent));
 
         await _channel.BasicPublishAsync(
-            exchange: "",
-            routingKey: queue,
-            body: body
-        );
+            exchange: exchange,
+            routingKey: "",   // fanout ignores routing key
+            body: body);
+    }
+    public async Task PublishStatusChangeAsync(TicketStatusChangedEvent changeEvent)
+    {
+        if (_channel is null)
+            throw new InvalidOperationException("Publisher not initialized. Call InitializeAsync first.");
+
+       var exchange = _config["RabbitMQ:Exchange"] ?? "ticket.events";
+        var body = Encoding.UTF8.GetBytes(JsonSerializer.Serialize(changeEvent));
+
+        await _channel.BasicPublishAsync(
+            exchange: exchange,
+            routingKey: "",   // fanout ignores routing key
+            body: body);
+    }
+    public async Task PublishTicketAssignedAsync(TicketAssignedEvent assignedEvent)
+    {
+        if (_channel is null)
+            throw new InvalidOperationException("Publisher not initialized. Call InitializeAsync first.");
+
+        var exchange = _config["RabbitMQ:Exchange"] ?? "ticket.events";
+        var body = Encoding.UTF8.GetBytes(JsonSerializer.Serialize(assignedEvent));
+
+        await _channel.BasicPublishAsync(
+            exchange: exchange,
+            routingKey: "",   // fanout ignores routing key
+            body: body);
     }
 
     public async ValueTask DisposeAsync()

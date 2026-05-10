@@ -6,7 +6,7 @@ using Microsoft.EntityFrameworkCore.Migrations;
 namespace SupportService.Migrations
 {
     /// <inheritdoc />
-    public partial class InitialCreate : Migration
+    public partial class InitCreate : Migration
     {
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
@@ -15,8 +15,7 @@ namespace SupportService.Migrations
                 name: "Agents",
                 columns: table => new
                 {
-                    Id = table.Column<int>(type: "int", nullable: false)
-                        .Annotation("SqlServer:Identity", "1, 1"),
+                    Id = table.Column<string>(type: "nvarchar(36)", maxLength: 36, nullable: false),
                     Name = table.Column<string>(type: "nvarchar(200)", maxLength: 200, nullable: false),
                     Email = table.Column<string>(type: "nvarchar(255)", maxLength: 255, nullable: false),
                     PhoneNumber = table.Column<string>(type: "nvarchar(20)", maxLength: 20, nullable: false),
@@ -37,7 +36,7 @@ namespace SupportService.Migrations
                     Id = table.Column<int>(type: "int", nullable: false)
                         .Annotation("SqlServer:Identity", "1, 1"),
                     TicketId = table.Column<int>(type: "int", nullable: false),
-                    AgentId = table.Column<int>(type: "int", nullable: false),
+                    AgentId = table.Column<string>(type: "nvarchar(36)", nullable: false),
                     AssignedBy = table.Column<string>(type: "nvarchar(100)", maxLength: 100, nullable: false),
                     AssignedAt = table.Column<DateTime>(type: "datetime2", nullable: false),
                     ResolvedAt = table.Column<DateTime>(type: "datetime2", nullable: true),
@@ -62,7 +61,9 @@ namespace SupportService.Migrations
                     Id = table.Column<int>(type: "int", nullable: false)
                         .Annotation("SqlServer:Identity", "1, 1"),
                     TicketId = table.Column<int>(type: "int", nullable: false),
-                    AgentId = table.Column<int>(type: "int", nullable: false),
+                    AgentId = table.Column<string>(type: "nvarchar(36)", maxLength: 36, nullable: false),
+                    UserId = table.Column<string>(type: "nvarchar(max)", nullable: false),
+                    Title = table.Column<string>(type: "nvarchar(max)", nullable: false),
                     AgentName = table.Column<string>(type: "nvarchar(200)", maxLength: 200, nullable: false),
                     Content = table.Column<string>(type: "nvarchar(max)", maxLength: 5000, nullable: false),
                     Resolution = table.Column<string>(type: "nvarchar(1000)", maxLength: 1000, nullable: false),
@@ -96,24 +97,9 @@ namespace SupportService.Migrations
                 column: "AgentId");
 
             migrationBuilder.CreateIndex(
-                name: "IX_Assignments_IsActive",
-                table: "Assignments",
-                column: "IsActive");
-
-            migrationBuilder.CreateIndex(
-                name: "IX_Assignments_TicketId",
-                table: "Assignments",
-                column: "TicketId");
-
-            migrationBuilder.CreateIndex(
                 name: "IX_TicketResponses_AgentId",
                 table: "TicketResponses",
                 column: "AgentId");
-
-            migrationBuilder.CreateIndex(
-                name: "IX_TicketResponses_TicketId",
-                table: "TicketResponses",
-                column: "TicketId");
         }
 
         /// <inheritdoc />

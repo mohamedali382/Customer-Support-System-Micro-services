@@ -10,14 +10,16 @@ public class TicketServiceClient
 {
     private readonly HttpClient _httpClient;
     private readonly IConfiguration _config;
+    private readonly RabbitMQPublisher _publisher;
     private readonly ILogger<TicketServiceClient> _logger;
 
     public TicketServiceClient(HttpClient httpClient, IConfiguration config,
-        ILogger<TicketServiceClient> logger)
+        ILogger<TicketServiceClient> logger, RabbitMQPublisher publisher)
     {
         _httpClient = httpClient;
         _config = config;
         _logger = logger;
+        _publisher = publisher;
     }
 
     private string BaseUrl => _config["Services:TicketService"] ?? "http://localhost:5006";
@@ -37,6 +39,7 @@ public class TicketServiceClient
             else
                 _logger.LogWarning("⚠️ Failed to update ticket #{TicketId} status. HTTP {Code}",
                     ticketId, response.StatusCode);
+
         }
         catch (Exception ex)
         {
@@ -45,7 +48,7 @@ public class TicketServiceClient
     }
 
     /// <summary>Update ticket assigned agent via TicketService API</summary>
-    public async Task AssignTicketAsync(int ticketId, int agentId, string agentName, string priority)
+    public async Task AssignTicketAsync(int ticketId, string agentId, string agentName, string priority)
     {
         try
         {

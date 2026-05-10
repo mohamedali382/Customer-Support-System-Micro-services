@@ -12,8 +12,8 @@ using SupportService.Data;
 namespace SupportService.Migrations
 {
     [DbContext(typeof(SupportDbContext))]
-    [Migration("20260508022400_InitialCreate")]
-    partial class InitialCreate
+    [Migration("20260509141630_InitCreate")]
+    partial class InitCreate
     {
         /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
@@ -27,11 +27,9 @@ namespace SupportService.Migrations
 
             modelBuilder.Entity("SupportService.Entities.Agent", b =>
                 {
-                    b.Property<int>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("int");
-
-                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+                    b.Property<string>("Id")
+                        .HasMaxLength(36)
+                        .HasColumnType("nvarchar(36)");
 
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("datetime2");
@@ -81,8 +79,9 @@ namespace SupportService.Migrations
 
                     SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
 
-                    b.Property<int>("AgentId")
-                        .HasColumnType("int");
+                    b.Property<string>("AgentId")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(36)");
 
                     b.Property<DateTime>("AssignedAt")
                         .HasColumnType("datetime2");
@@ -110,10 +109,6 @@ namespace SupportService.Migrations
 
                     b.HasIndex("AgentId");
 
-                    b.HasIndex("IsActive");
-
-                    b.HasIndex("TicketId");
-
                     b.ToTable("Assignments");
                 });
 
@@ -125,8 +120,10 @@ namespace SupportService.Migrations
 
                     SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
 
-                    b.Property<int>("AgentId")
-                        .HasColumnType("int");
+                    b.Property<string>("AgentId")
+                        .IsRequired()
+                        .HasMaxLength(36)
+                        .HasColumnType("nvarchar(36)");
 
                     b.Property<string>("AgentName")
                         .IsRequired()
@@ -149,11 +146,17 @@ namespace SupportService.Migrations
                     b.Property<int>("TicketId")
                         .HasColumnType("int");
 
+                    b.Property<string>("Title")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
+                    b.Property<string>("UserId")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
+
                     b.HasKey("Id");
 
                     b.HasIndex("AgentId");
-
-                    b.HasIndex("TicketId");
 
                     b.ToTable("TicketResponses");
                 });

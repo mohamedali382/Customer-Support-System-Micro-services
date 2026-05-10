@@ -1,7 +1,7 @@
 ﻿namespace SupportService.DTOs.AgentDTOs
 {
     public record AgentResponse(
-        int Id,
+        string Id,
         string Name,
         string Email,
         string PhoneNumber,

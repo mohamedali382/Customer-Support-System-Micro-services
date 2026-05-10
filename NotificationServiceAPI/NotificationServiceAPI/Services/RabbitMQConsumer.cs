@@ -13,6 +13,7 @@ using NotificationServiceAPI.Entities;
 using System.Threading.Tasks;
 using System.Threading;
 using System;
+using System.Text.Json.Serialization;
 
 namespace NotificationServiceAPI.Services;
 
@@ -59,8 +60,16 @@ public class RabbitMQConsumer : BackgroundService
                 _connection = await factory.CreateConnectionAsync(stoppingToken);
                 _channel = await _connection.CreateChannelAsync(cancellationToken: stoppingToken);
 
-                var queue = _config["RabbitMQ:Queue"] ?? "Ticket_queue";
+                var exchange = _config["RabbitMQ:Exchange"] ?? "ticket.events";
+                var queue = _config["RabbitMQ:Queue"] ?? "Notification_queue";
 
+                // 👇 Declare the exchange
+                await _channel.ExchangeDeclareAsync(
+                    exchange: exchange,
+                    type: ExchangeType.Fanout,
+                    durable: true);
+
+                // Declare notification's own queue
                 await _channel.QueueDeclareAsync(
                     queue: queue,
                     durable: true,
@@ -68,10 +77,14 @@ public class RabbitMQConsumer : BackgroundService
                     autoDelete: false,
                     arguments: null);
 
-                // Process one message at a time
+                // 👇 Bind queue to exchange
+                await _channel.QueueBindAsync(
+                    queue: queue,
+                    exchange: exchange,
+                    routingKey: "");
+
                 await _channel.BasicQosAsync(prefetchSize: 0, prefetchCount: 1, global: false);
 
-                // Single consumer on the single queue
                 var consumer = new AsyncEventingBasicConsumer(_channel);
 
                 consumer.ReceivedAsync += async (_, ea) =>
@@ -81,15 +94,12 @@ public class RabbitMQConsumer : BackgroundService
                     try
                     {
                         await HandleMessageAsync(body);
-
                         await _channel.BasicAckAsync(ea.DeliveryTag, multiple: false);
                     }
                     catch (Exception ex)
                     {
                         _logger.LogError(ex, "Failed to process message");
-
-                        // ✅ NACK — requeue so message is not lost
-                        await _channel.BasicNackAsync(ea.DeliveryTag, multiple: false, requeue: true);
+                        await _channel.BasicNackAsync(ea.DeliveryTag, multiple: false, requeue: false);
                     }
                 };
 
@@ -115,31 +125,34 @@ public class RabbitMQConsumer : BackgroundService
         }
     }
 
-
+    private static readonly JsonSerializerOptions _jsonOptions = new()
+    {
+        Converters = { new JsonStringEnumConverter() }
+    };
 
     private async Task HandleMessageAsync(string body)
     {
         using var doc = JsonDocument.Parse(body);
 
-        var eventType = (EventType)doc.RootElement
-            .GetProperty("EventType")
-            .GetInt32();
+        var eventTypeProp = doc.RootElement.GetProperty("EventType");
+
+        EventType eventType;
+        if (eventTypeProp.ValueKind == JsonValueKind.String)
+            eventType = Enum.Parse<EventType>(eventTypeProp.GetString()!);
+        else
+            eventType = (EventType)eventTypeProp.GetInt32();
 
         _logger.LogInformation("📨 Event received: {EventType}", eventType);
 
         switch (eventType)
         {
-            // =========================
-            // TICKET CREATED
-            // =========================
             case EventType.TicketCreated:
                 {
-                    var evt = JsonSerializer.Deserialize<TicketCreatedEvent>(body);
+                    var evt = JsonSerializer.Deserialize<TicketCreatedEvent>(body, _jsonOptions); // ✅
 
                     if (evt is null) return;
 
                     if (!string.IsNullOrEmpty(evt.UserId))
-                    {
                         await CreateNotificationAsync(
                             recipientId: evt.UserId,
                             recipientType: RecipientType.User,
@@ -148,10 +161,8 @@ public class RabbitMQConsumer : BackgroundService
                             type: NotificationType.TicketCreated,
                             description: $"Your ticket \"{evt.Title}\" was created successfully."
                         );
-                    }
 
                     if (!string.IsNullOrEmpty(evt.AgentId))
-                    {
                         await CreateNotificationAsync(
                             recipientId: evt.AgentId,
                             recipientType: RecipientType.Agent,
@@ -160,22 +171,17 @@ public class RabbitMQConsumer : BackgroundService
                             type: NotificationType.TicketCreated,
                             description: $"New ticket available: \"{evt.Title}\""
                         );
-                    }
 
                     break;
                 }
 
-            // =========================
-            // TICKET ASSIGNED
-            // =========================
             case EventType.TicketAssigned:
                 {
-                    var evt = JsonSerializer.Deserialize<TicketAssignedEvent>(body);
+                    var evt = JsonSerializer.Deserialize<TicketAssignedEvent>(body, _jsonOptions); // ✅
 
                     if (evt is null) return;
 
                     if (!string.IsNullOrEmpty(evt.UserId))
-                    {
                         await CreateNotificationAsync(
                             recipientId: evt.UserId,
                             recipientType: RecipientType.User,
@@ -184,10 +190,8 @@ public class RabbitMQConsumer : BackgroundService
                             type: NotificationType.TicketAssigned,
                             description: $"Your ticket was assigned to {evt.AgentName}."
                         );
-                    }
 
                     if (!string.IsNullOrEmpty(evt.AgentId))
-                    {
                         await CreateNotificationAsync(
                             recipientId: evt.AgentId,
                             recipientType: RecipientType.Agent,
@@ -196,17 +200,13 @@ public class RabbitMQConsumer : BackgroundService
                             type: NotificationType.TicketAssigned,
                             description: $"You have been assigned ticket \"{evt.Title}\"."
                         );
-                    }
 
                     break;
                 }
 
-            // =========================
-            // STATUS CHANGED
-            // =========================
             case EventType.TicketStatusChanged:
                 {
-                    var evt = JsonSerializer.Deserialize<TicketStatusChangedEvent>(body);
+                    var evt = JsonSerializer.Deserialize<TicketStatusChangedEvent>(body, _jsonOptions); // ✅
 
                     if (evt is null) return;
 
@@ -217,7 +217,7 @@ public class RabbitMQConsumer : BackgroundService
                             "Resolved" => $"Your ticket \"{evt.Title}\" has been resolved. ✅",
                             "Closed" => $"Your ticket \"{evt.Title}\" has been closed.",
                             "InProgress" => $"Your ticket \"{evt.Title}\" is now in progress.",
-                            _ => $"Status changed to {evt.Status}."
+                            _ => $"Status of \"{evt.Title}\" changed to {evt.Status}."
                         };
 
                         await CreateNotificationAsync(
@@ -233,18 +233,13 @@ public class RabbitMQConsumer : BackgroundService
                     break;
                 }
 
-            // =========================
-            // COMMENT ADDED
-            // =========================
             case EventType.TicketCommentAdded:
                 {
-                    var evt = JsonSerializer.Deserialize<TicketCommentAddedEvent>(body);
+                    var evt = JsonSerializer.Deserialize<TicketCommentAddedEvent>(body, _jsonOptions); // ✅
 
-                    if (evt is null || !evt.IsAgentReply)
-                        break;
+                    if (evt is null || !evt.IsAgentReply) break;
 
                     if (!string.IsNullOrEmpty(evt.UserId))
-                    {
                         await CreateNotificationAsync(
                             recipientId: evt.UserId,
                             recipientType: RecipientType.User,
@@ -253,7 +248,6 @@ public class RabbitMQConsumer : BackgroundService
                             type: NotificationType.TicketCommentAdded,
                             description: $"Agent {evt.AuthorName} replied to your ticket."
                         );
-                    }
 
                     break;
                 }

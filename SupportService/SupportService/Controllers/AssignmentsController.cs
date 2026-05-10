@@ -1,52 +1,118 @@
-﻿using Microsoft.AspNetCore.Mvc;
+﻿using System.Security.Claims;
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc;
 using SupportService.DTOs.AssignmentDTOs;
 using SupportService.Services.Interfaces;
 
-namespace SupportService.Controllers
+namespace SupportService.Controllers;
+
+[ApiController]
+[Route("api/[controller]")]
+//[Authorize]
+public class AssignmentsController : ControllerBase
 {
-    [ApiController]
-    [Route("api/[controller]")]
-    public class AssignmentsController : ControllerBase
+    private readonly IAssignmentService _assignmentService;
+
+    public AssignmentsController(IAssignmentService assignmentService)
+        => _assignmentService = assignmentService;
+
+    [HttpGet("open")]
+    public async Task<IActionResult> GetAll()
     {
-        private readonly IAssignmentService _assignmentService;
+        var tickets = await _assignmentService.GetAllAsync();
+        return Ok(tickets);
+    }
 
-        public AssignmentsController(IAssignmentService assignmentService)
-            => _assignmentService = assignmentService;
+    // =========================
+    // GET: api/tickets/open/{id}
+    // (Only OPEN ticket by ID)
+    // =========================
+    [HttpGet("open/{id:int}")]
+    public async Task<IActionResult> GetOpenById(int id)
+    {
+        var ticket = await _assignmentService.GetOpenByIdAsync(id);
 
-        [HttpPost]
-        public async Task<IActionResult> Assign([FromBody] AssignTicketRequest request)
+        if (ticket is null)
         {
-            try
+            return NotFound(new
             {
-                var assignment = await _assignmentService.AssignTicketAsync(request);
-                return Ok(assignment);
-            }
-            catch (KeyNotFoundException ex)
-            {
-                return NotFound(new { message = ex.Message });
-            }
+                message = $"Open ticket #{id} not found."
+            });
         }
 
-        [HttpGet("ticket/{ticketId:int}")]
-        public async Task<IActionResult> GetByTicket(int ticketId)
+        return Ok(ticket);
+    }
+
+    //[Authorize(Roles = "Admin")]
+    [HttpPost]
+    public async Task<IActionResult> Assign([FromBody] AssignTicketRequest request)
+    {
+        //var adminId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+        //var adminName = User.FindFirst(ClaimTypes.Name)?.Value;
+
+        //if (string.IsNullOrEmpty(adminId))
+        //    return Unauthorized();
+
+        //request.AssignedBy = adminName ?? adminId;
+
+        try
         {
-            var assignment = await _assignmentService.GetActiveAssignmentAsync(ticketId);
-            return assignment is null
-                ? NotFound(new { message = $"No active assignment for ticket #{ticketId}." })
-                : Ok(assignment);
+            var assignment = await _assignmentService.AssignTicketAsync(request);
+            return Ok(assignment);
         }
-
-        [HttpGet("agent/{agentId:int}")]
-        public async Task<IActionResult> GetByAgent(int agentId)
-            => Ok(await _assignmentService.GetAgentAssignmentsAsync(agentId));
-
-        [HttpPost("resolve")]
-        public async Task<IActionResult> Resolve([FromBody] ResolveAssignmentRequest request)
+        catch (KeyNotFoundException ex)
         {
-            var result = await _assignmentService.ResolveAsync(request);
-            return result
-                ? Ok(new { message = $"Ticket #{request.TicketId} resolved successfully." })
-                : NotFound(new { message = $"No active assignment for ticket #{request.TicketId}." });
+            return NotFound(new { message = ex.Message });
         }
+    }
+
+    //[Authorize(Roles = "Admin,Agent")]
+    [HttpGet("ticket/{ticketId:int}")]
+    public async Task<IActionResult> GetByTicket(int ticketId)
+    {
+        var assignment = await _assignmentService.GetActiveAssignmentAsync(ticketId);
+        return assignment is null
+            ? NotFound(new { message = $"No active assignment for ticket #{ticketId}." })
+            : Ok(assignment);
+    }
+
+
+    //[Authorize(Roles = "Admin,Agent")]
+    [HttpGet("agent/{agentId}")]
+    public async Task<IActionResult> GetByAgent(string agentId)
+    {
+        if (User.IsInRole("Agent"))
+        {
+            var currentAgentId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+            if (currentAgentId != agentId)
+                return Forbid();
+        }
+
+        var assignments = await _assignmentService.GetAgentAssignmentsAsync(agentId);
+        return Ok(assignments);
+    }
+
+
+    //[Authorize(Roles = "Agent")]
+    [HttpPost("resolve")]
+    public async Task<IActionResult> Resolve([FromBody] ResolveAssignmentRequest request)
+    {
+        //var agentId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+        //if (string.IsNullOrEmpty(agentId))
+        //    return Unauthorized();
+
+        var assignment = await _assignmentService.GetActiveAssignmentAsync(request.TicketId);
+        if (assignment is null)
+            return NotFound(new { message = $"No active assignment for ticket #{request.TicketId}." });
+
+        //if (assignment.AgentId != agentId)
+        //    return Forbid();
+
+        //request.AgentId = agentId;
+
+        var result = await _assignmentService.ResolveAsync(request);
+        return result
+            ? Ok(new { message = $"Ticket #{request.TicketId} resolved successfully." })
+            : NotFound(new { message = $"No active assignment for ticket #{request.TicketId}." });
     }
 }

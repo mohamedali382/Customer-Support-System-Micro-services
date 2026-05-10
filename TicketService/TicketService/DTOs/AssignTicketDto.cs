@@ -2,7 +2,7 @@
 {
     public class AssignTicketDto
     {
-        public int AgentId { get; set; }
+        public string AgentId { get; set; }
         public string AgentName { get; set; } = string.Empty;
 
         public string Priority { get; set; }
