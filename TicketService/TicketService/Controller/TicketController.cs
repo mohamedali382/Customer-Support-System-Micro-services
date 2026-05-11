@@ -27,7 +27,7 @@ namespace TicketService.Controller
             var createdTicket = await _ticketService.CreateTicketAsync(userId, ticketDto);
             return Ok(createdTicket);
         }
-        //[Authorize(Roles = "Agent")]
+        [AllowAnonymous]
         [HttpPatch("{id}/status")]
         public async Task<IActionResult> UpdateStatus(int id, [FromBody] UpdateStatusDto dto)
         {
@@ -36,7 +36,7 @@ namespace TicketService.Controller
                 return NotFound();
             return Ok(result);
         }
-        //[Authorize(Roles = "Admin")]
+        [AllowAnonymous]
         [HttpPatch("{id}/assign")]
         public async Task<IActionResult> AssignTicket(int id, [FromBody] AssignTicketDto dto)
         {
@@ -75,6 +75,16 @@ namespace TicketService.Controller
             if (string.IsNullOrEmpty(userId))
                 return Unauthorized();
             var tickets = await _ticketService.GetAllTicketsAsync(userId);
+            return Ok(tickets);
+        }
+
+        [AllowAnonymous]  
+        [HttpGet("resolved")]
+        public async Task<IActionResult> GetResolved(
+    [FromQuery] DateTime? from,
+    [FromQuery] DateTime? to)
+        {
+            var tickets = await _ticketService.GetResolvedTicketsAsync(from, to);
             return Ok(tickets);
         }
     }

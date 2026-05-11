@@ -1,5 +1,6 @@
 using IdentityService.DTOs;
 using IdentityService.Services.Interfaces;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
 namespace IdentityService.Controllers
@@ -23,7 +24,7 @@ namespace IdentityService.Controllers
 
             var result = await _authService.RegisterAsync(dto);
 
-            if (!result)
+            if (string.IsNullOrEmpty(result))
             {
                 return BadRequest(new
                 {
@@ -31,10 +32,7 @@ namespace IdentityService.Controllers
                 });
             }
 
-            return Ok(new
-            {
-                Message = "User registered successfully."
-            });
+            return Ok(new { Id = result });
         }
 
         [HttpPost("login")]
@@ -59,6 +57,14 @@ namespace IdentityService.Controllers
             {
                 Token = token
             });
+        }
+
+        [Authorize(Roles = "Admin")]
+        [HttpGet("users")]
+        public async Task<IActionResult> GetAllUsers()
+        {
+            var users = await _authService.GetAllUsersAsync();
+            return Ok(users);
         }
     }
 }

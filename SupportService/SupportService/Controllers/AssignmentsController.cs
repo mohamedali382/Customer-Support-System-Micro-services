@@ -8,7 +8,7 @@ namespace SupportService.Controllers;
 
 [ApiController]
 [Route("api/[controller]")]
-//[Authorize]
+
 public class AssignmentsController : ControllerBase
 {
     private readonly IAssignmentService _assignmentService;
@@ -17,6 +17,7 @@ public class AssignmentsController : ControllerBase
         => _assignmentService = assignmentService;
 
     [HttpGet("open")]
+    [Authorize(Roles = "Admin")]
     public async Task<IActionResult> GetAll()
     {
         var tickets = await _assignmentService.GetAllAsync();
@@ -28,6 +29,7 @@ public class AssignmentsController : ControllerBase
     // (Only OPEN ticket by ID)
     // =========================
     [HttpGet("open/{id:int}")]
+    [Authorize(Roles = "Admin")]
     public async Task<IActionResult> GetOpenById(int id)
     {
         var ticket = await _assignmentService.GetOpenByIdAsync(id);
@@ -43,17 +45,17 @@ public class AssignmentsController : ControllerBase
         return Ok(ticket);
     }
 
-    //[Authorize(Roles = "Admin")]
     [HttpPost]
+    [Authorize(Roles = "Admin")]
     public async Task<IActionResult> Assign([FromBody] AssignTicketRequest request)
     {
-        //var adminId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
-        //var adminName = User.FindFirst(ClaimTypes.Name)?.Value;
+        var adminId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+        var adminName = User.FindFirst(ClaimTypes.Name)?.Value;
 
-        //if (string.IsNullOrEmpty(adminId))
-        //    return Unauthorized();
+        if (string.IsNullOrEmpty(adminId))
+            return Unauthorized();
 
-        //request.AssignedBy = adminName ?? adminId;
+        request.AssignedBy = adminName ?? adminId;
 
         try
         {
@@ -66,8 +68,9 @@ public class AssignmentsController : ControllerBase
         }
     }
 
-    //[Authorize(Roles = "Admin,Agent")]
     [HttpGet("ticket/{ticketId:int}")]
+    [Authorize(Roles = "Admin")]
+    [Authorize(Roles = "Agent")]
     public async Task<IActionResult> GetByTicket(int ticketId)
     {
         var assignment = await _assignmentService.GetActiveAssignmentAsync(ticketId);
@@ -77,8 +80,8 @@ public class AssignmentsController : ControllerBase
     }
 
 
-    //[Authorize(Roles = "Admin,Agent")]
     [HttpGet("agent/{agentId}")]
+    [Authorize]
     public async Task<IActionResult> GetByAgent(string agentId)
     {
         if (User.IsInRole("Agent"))
@@ -86,6 +89,8 @@ public class AssignmentsController : ControllerBase
             var currentAgentId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
             if (currentAgentId != agentId)
                 return Forbid();
+
+            Console.WriteLine("user is agent");
         }
 
         var assignments = await _assignmentService.GetAgentAssignmentsAsync(agentId);
@@ -93,22 +98,22 @@ public class AssignmentsController : ControllerBase
     }
 
 
-    //[Authorize(Roles = "Agent")]
     [HttpPost("resolve")]
+    [Authorize(Roles = "Agent")]
     public async Task<IActionResult> Resolve([FromBody] ResolveAssignmentRequest request)
     {
-        //var agentId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
-        //if (string.IsNullOrEmpty(agentId))
-        //    return Unauthorized();
+        var agentId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+        if (string.IsNullOrEmpty(agentId))
+            return Unauthorized();
 
         var assignment = await _assignmentService.GetActiveAssignmentAsync(request.TicketId);
         if (assignment is null)
             return NotFound(new { message = $"No active assignment for ticket #{request.TicketId}." });
 
-        //if (assignment.AgentId != agentId)
-        //    return Forbid();
+        if (assignment.AgentId != agentId)
+            return Forbid();
 
-        //request.AgentId = agentId;
+        request.AgentId = agentId;
 
         var result = await _assignmentService.ResolveAsync(request);
         return result

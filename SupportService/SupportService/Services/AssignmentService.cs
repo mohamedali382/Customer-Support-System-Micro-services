@@ -63,61 +63,60 @@ namespace SupportService.Services
         public async Task<AssignmentResponse> AssignTicketAsync(AssignTicketRequest request)
         {
             var ticket = await _context.TicketSnapshots
-                .FirstOrDefaultAsync(t => t.TicketId == request.TicketId);
-            if (ticket is null)
-                throw new KeyNotFoundException($"Ticket #{request.TicketId} not found in SupportService.");
+                .FirstOrDefaultAsync(t => t.TicketId == request.TicketId)
+                ?? throw new KeyNotFoundException($"Ticket #{request.TicketId} not found.");
 
             var agent = await _context.Agents.FindAsync(request.AgentId)
                 ?? throw new KeyNotFoundException($"Agent #{request.AgentId} not found.");
 
-            // Deactivate existing assignment if any
+            // Deactivate old assignment
             var existing = await _context.Assignments
                 .FirstOrDefaultAsync(a => a.TicketId == request.TicketId && a.IsActive);
-
             if (existing is not null)
             {
                 existing.IsActive = false;
                 existing.ResolvedAt = DateTime.UtcNow;
             }
 
-            // Create new assignment
+            // New assignment
             var assignment = new TicketAssignment
             {
                 TicketId = request.TicketId,
                 AgentId = request.AgentId,
                 AssignedBy = request.AssignedBy ?? "system",
+                Title = ticket.Title,
+                Description = ticket.Description,
                 Notes = request.Notes,
                 AssignedAt = DateTime.UtcNow,
                 IsActive = true
             };
             _context.Assignments.Add(assignment);
 
-            // Update agent status
+            // Update agent
             if (agent.Status == AgentStatus.Available)
             {
                 agent.Status = AgentStatus.Busy;
                 agent.UpdatedAt = DateTime.UtcNow;
             }
 
-            
+            // Update snapshot
             ticket.Status = "Assigned";
             _context.TicketSnapshots.Update(ticket);
 
-            
+            // ✅ Save SupportService DB first
+            await _context.SaveChangesAsync();
 
-            _logger.LogInformation(
-                "✅ Ticket #{TicketId} assigned to Agent #{AgentId}",
+            _logger.LogInformation("✅ Ticket #{TicketId} assigned to Agent #{AgentId}",
                 request.TicketId, request.AgentId);
 
-            
+            // ✅ Then update TicketService DB
             await _ticketClient.AssignTicketAsync(
                 request.TicketId,
                 request.AgentId,
                 agent.Name,
                 request.Priority);
 
-            await _context.SaveChangesAsync();
-
+            // ✅ Then publish events
             await _publisher.PublishStatusChangeAsync(new TicketStatusChangedEvent
             {
                 TicketId = request.TicketId,
@@ -140,7 +139,6 @@ namespace SupportService.Services
 
             return MapAssignment(assignment, agent.Name);
         }
-
         public async Task<AssignmentResponse?> GetActiveAssignmentAsync(
             int ticketId)
         {
@@ -232,6 +230,8 @@ namespace SupportService.Services
                 a.TicketId,
                 a.AgentId,
                 agentName,
+                a.Description,
+                a.Title,
                 a.AssignedBy,
                 a.AssignedAt,
                 a.ResolvedAt,

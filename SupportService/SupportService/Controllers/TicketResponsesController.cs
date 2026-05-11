@@ -8,7 +8,7 @@ namespace SupportService.Controllers
 {
     [ApiController]
     [Route("api/ticket-responses")]
-    //[Authorize]
+    [Authorize]
     public class TicketResponsesController : ControllerBase
     {
         private readonly ITicketResponseService _responseService;
@@ -17,20 +17,21 @@ namespace SupportService.Controllers
             => _responseService = responseService;
 
         [HttpPost]
-        //[Authorize(Roles = "Agent,Admin")] 
+        [Authorize(Roles = "Agent,Admin")]
         public async Task<IActionResult> AddResponse([FromBody] AddTicketResponseRequest request)
         {
             if (string.IsNullOrWhiteSpace(request.Content))
                 return BadRequest(new { message = "Content is required." });
 
-            //var agentId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
-            //var agentName = User.FindFirst(ClaimTypes.Name)?.Value;
+            var agentId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+            var agentName = User.FindFirst(ClaimTypes.Name)?.Value;
 
-            //if (string.IsNullOrEmpty(agentId))
-            //    return Unauthorized();
+            if (string.IsNullOrEmpty(agentId))
+                return Unauthorized();
 
             try
             {
+                request.AgentId = agentId;
                 var response = await _responseService.AddResponseAsync(
                     request
                 );
@@ -43,7 +44,7 @@ namespace SupportService.Controllers
             }
         }
         [HttpGet("ticket/{ticketId:int}")]
-        //[Authorize]
+        [Authorize]
         public async Task<IActionResult> GetByTicket(int ticketId)
         {
             var responses = await _responseService.GetResponsesByTicketAsync(ticketId);

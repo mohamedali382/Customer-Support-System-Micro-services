@@ -15,17 +15,16 @@ public class IdentityServiceClient
         _config = config;
     }
 
-    public async Task CreateAgentAccountAsync(CreateIdentityAgentRequest request)
+    public async Task<string> CreateAgentAccountAsync(CreateIdentityAgentRequest request)
     {
         var baseUrl = _config["Services:IdentityService"] ?? "http://localhost:5037";
         var response = await _httpClient.PostAsJsonAsync(
             $"{baseUrl}/api/auth/register", request);
 
         if (!response.IsSuccessStatusCode)
-        {
-            var error = await response.Content.ReadAsStringAsync();
-            throw new HttpRequestException(
-                $"IdentityService registration failed: {response.StatusCode} - {error}");
-        }
+            throw new Exception($"Failed to create identity account: {response.StatusCode}");
+
+        var result = await response.Content.ReadFromJsonAsync<CreateAgentResult>();
+        return result!.Id;
     }
 }

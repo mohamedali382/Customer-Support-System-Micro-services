@@ -43,8 +43,28 @@ namespace SupportService.Services
             if (await _context.Agents.AnyAsync(a => a.Email == request.Email))
                 throw new InvalidOperationException($"Agent with email {request.Email} already exists.");
 
+            // ✅ Get the identity user ID first
+            string identityUserId;
+            try
+            {
+                identityUserId = await _identityClient.CreateAgentAccountAsync(new CreateIdentityAgentRequest
+                {
+                    FullName = request.Name,
+                    Email = request.Email,
+                    Password = request.Password,
+                    PhoneNumber = request.PhoneNumber
+
+                });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Failed to create Identity account for {Email}", request.Email);
+                throw;
+            }
+
             var agent = new Agent
             {
+                Id = identityUserId,
                 Name = request.Name,
                 Email = request.Email,
                 PhoneNumber = request.PhoneNumber,
@@ -53,23 +73,6 @@ namespace SupportService.Services
                 CreatedAt = DateTime.UtcNow,
                 UpdatedAt = DateTime.UtcNow
             };
-
-            try
-            {
-                await _identityClient.CreateAgentAccountAsync(new CreateIdentityAgentRequest
-                {
-                    FullName = request.Name,
-                    Email = request.Email,
-                    Password = request.Password,
-                    PhoneNumber = request.PhoneNumber,
-                    Role = "Agent"
-                });
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Failed to create Identity account for {Email}", request.Email);
-                throw;
-            }
 
             _context.Agents.Add(agent);
             await _context.SaveChangesAsync();

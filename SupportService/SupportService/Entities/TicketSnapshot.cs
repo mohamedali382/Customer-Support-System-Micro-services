@@ -10,5 +10,7 @@
 
     public string Status { get; set; } = "Open";
 
+    public string Description { get; set; } = default!;
+
     public DateTime CreatedAt { get; set; }
 }

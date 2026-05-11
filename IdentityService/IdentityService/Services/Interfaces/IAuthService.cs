@@ -4,8 +4,10 @@ namespace IdentityService.Services.Interfaces
 {
     public interface IAuthService
     {
-        Task<bool> RegisterAsync(RegisterDto dto);
+        Task<string?> RegisterAsync(RegisterDto dto);
 
-        Task<string?> LoginAsync(LoginDto dto);
+        Task<AuthResultDto?> LoginAsync(LoginDto dto);
+
+        Task<List<UserDto>> GetAllUsersAsync();
     }
 }

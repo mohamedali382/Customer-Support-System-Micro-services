@@ -21,13 +21,10 @@ namespace IdentityService.Services
             _jwtService = jwtService;
         }
 
-        public async Task<bool> RegisterAsync(RegisterDto dto)
+        public async Task<string?> RegisterAsync(RegisterDto dto)
         {
-            var exists = await _context.Users
-                .AnyAsync(u => u.Email == dto.Email);
-
-            if (exists)
-                return false;
+            var exists = await _context.Users.AnyAsync(u => u.Email == dto.Email);
+            if (exists) return null;
 
             var user = new ApplicationUser
             {
@@ -35,46 +32,58 @@ namespace IdentityService.Services
                 FullName = dto.FullName,
                 Email = dto.Email,
                 PhoneNumber = dto.PhoneNumber,
-                Role = dto.Role
+                Role = dto.Role 
             };
 
-            var hasher =
-                new PasswordHasher<ApplicationUser>();
-
-            user.PasswordHash =
-                hasher.HashPassword(user, dto.Password);
+            var hasher = new PasswordHasher<ApplicationUser>();
+            user.PasswordHash = hasher.HashPassword(user, dto.Password);
 
             _context.Users.Add(user);
-
             await _context.SaveChangesAsync();
 
-            return true;
+            return user.Id.ToString();   // ✅ return the ID
         }
 
-        public async Task<string?> LoginAsync(LoginDto dto)
+        public async Task<AuthResultDto?> LoginAsync(LoginDto dto)
         {
             var user = await _context.Users
-                .FirstOrDefaultAsync(
-                    u => u.Email == dto.Email
-                );
+                .FirstOrDefaultAsync(u => u.Email == dto.Email);
 
             if (user == null)
                 return null;
 
             var hasher = new PasswordHasher<ApplicationUser>();
+            var result = hasher.VerifyHashedPassword(user, user.PasswordHash, dto.Password);
 
-            var result =
-                hasher.VerifyHashedPassword(
-                    user,
-                    user.PasswordHash,
-                    dto.Password
-                );
-
-            if (result ==
-                PasswordVerificationResult.Failed)
+            if (result == PasswordVerificationResult.Failed)
                 return null;
 
-            return _jwtService.GenerateToken(user);
+            var token = _jwtService.GenerateToken(user);
+
+        
+            return new AuthResultDto
+            {
+                Token = token,
+                Id = user.Id.ToString(),
+                Email = user.Email,
+                FullName = user.FullName,
+                Role = user.Role,
+                PhoneNumber = user.PhoneNumber ?? ""
+            };
+        }
+
+        public async Task<List<UserDto>> GetAllUsersAsync()
+        {
+            return await _context.Users
+                .Where(u => u.Role == "User")
+                .Select(u => new UserDto
+                {
+                    Id = u.Id.ToString(),
+                    FullName = u.FullName,
+                    Email = u.Email,
+                    PhoneNumber = u.PhoneNumber ?? ""
+                })
+                .ToListAsync();
         }
     }
 }

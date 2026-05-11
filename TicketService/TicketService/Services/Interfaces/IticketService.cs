@@ -9,6 +9,7 @@ namespace TicketService.Services.Interfaces
         Task<bool> UpdateTicketStatusAsync(int id, string status);
         Task<bool> AssignTicketAsync(int ticketId, string agentId, string agentName, string priority);
         Task<IEnumerable<TicketDtoResponse>> GetAllTicketsAsync(string userId);
+        Task<IEnumerable<TicketResolvedDtoResponse>> GetResolvedTicketsAsync(DateTime? from, DateTime? to);
 
     }
 }

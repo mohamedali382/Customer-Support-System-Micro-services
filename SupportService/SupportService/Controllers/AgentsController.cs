@@ -7,7 +7,7 @@ namespace SupportService.Controllers
 {
     [ApiController]
     [Route("api/agents")]
-    //[Authorize]
+    
     public class AgentsController : ControllerBase
     {
         private readonly IAgentService _agentService;
@@ -16,12 +16,13 @@ namespace SupportService.Controllers
             => _agentService = agentService;
 
         [HttpGet]
-        //[Authorize(Roles = "Admin,Manager")]
+        //[Authorize]
+        
         public async Task<IActionResult> GetAll([FromQuery] string? status = null)
             => Ok(await _agentService.GetAllAsync(status));
 
         [HttpGet("{id}")]
-        //[Authorize(Roles = "Admin,Agent")]
+        //[Authorize]
         public async Task<IActionResult> GetById(string id)
         {
             var agent = await _agentService.GetByIdAsync(id);
@@ -33,7 +34,7 @@ namespace SupportService.Controllers
         }
 
         [HttpPost]
-        //[Authorize(Roles = "Admin")]
+        [Authorize(Roles = "Admin")]
         public async Task<IActionResult> Create([FromBody] CreateAgentRequest request)
         {
             if (string.IsNullOrEmpty(request.Name))
@@ -56,7 +57,7 @@ namespace SupportService.Controllers
 
 
         [HttpPut("{id}")]
-        //[Authorize(Roles = "Admin")]
+        [Authorize(Roles = "Admin")]
         public async Task<IActionResult> Update(string id, [FromBody] UpdateAgentRequest request)
         {
             var agent = await _agentService.UpdateAsync(id, request);
@@ -67,7 +68,7 @@ namespace SupportService.Controllers
         }
 
         [HttpPatch("{id}/status")]
-        //[Authorize(Roles = "Admin,Agent")]
+        [Authorize(Roles = "Admin,Agent")]
         public async Task<IActionResult> UpdateStatus(string id, [FromBody] UpdateStatusRequest request)
         {
             var valid = new[] { "Available", "Busy", "Offline" };
@@ -84,8 +85,8 @@ namespace SupportService.Controllers
                 ? NotFound(new { message = $"Agent #{id} not found." })
                 : Ok(agent);
         }
+        [Authorize(Roles = "Admin")]
         [HttpDelete("{id}")]
-        //[Authorize(Roles = "Admin")]
         public async Task<IActionResult> Delete(string id)
         {
             var result = await _agentService.DeleteAsync(id);

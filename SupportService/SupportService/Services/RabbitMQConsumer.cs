@@ -128,6 +128,7 @@ public class RabbitMQConsumer : BackgroundService
             TicketId = evt.TicketId,
             UserId = evt.UserId,
             Title = evt.Title,
+            Description = evt.Description,
             Status = "open",
             CreatedAt = evt.CreatedAt
         };

@@ -34,7 +34,8 @@ public class SupportDbContext : DbContext
         {
             entity.HasKey(a => a.Id);
             entity.Property(a => a.AssignedBy).HasMaxLength(100);
-            entity.Property(a => a.Notes).HasMaxLength(500);
+           entity.Property(a => a.Title).HasMaxLength(1000);
+            entity.Property(a => a.Description).HasMaxLength(5000);
 
 
             entity.HasOne(a => a.Agent)

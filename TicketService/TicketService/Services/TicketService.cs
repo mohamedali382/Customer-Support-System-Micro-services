@@ -93,6 +93,7 @@ namespace TicketService.Services
             ticket.Status = status;
             ticket.Updated = DateTime.UtcNow;
 
+            _context.Tickets.Update(ticket);
             await _context.SaveChangesAsync();
 
             return true;
@@ -112,6 +113,8 @@ namespace TicketService.Services
             ticket.Status = "Assigned";
             ticket.Updated = DateTime.UtcNow;
 
+            _context.Tickets.Update(ticket);
+
             await _context.SaveChangesAsync();
 
             return true;
@@ -129,6 +132,30 @@ namespace TicketService.Services
                 Updated = ticket.Updated,
                 Status = ticket.Status
             }).ToList();
+        }
+
+        public async Task<IEnumerable<TicketResolvedDtoResponse>> GetResolvedTicketsAsync(DateTime? from, DateTime? to)
+        {
+            var query = _context.Tickets
+                .Where(t => t.Status == "Resolved");
+
+            if (from.HasValue) query = query.Where(t => t.Created >= from.Value);
+            if (to.HasValue) query = query.Where(t => t.Created <= to.Value);
+
+            var tickets = await query.ToListAsync();
+
+            return tickets.Select(t => new TicketResolvedDtoResponse
+            {
+                Id = t.Id,
+                UserId = t.UserId,
+                Title = t.Title,
+                Status = t.Status,
+                Priority = t.Priority,
+                AgentId = t.AssignedAgentId,
+                AgentName = t.AssignedAgentName,
+                CreatedAt = t.Created,
+                ResolvedAt = t.Updated,
+            });
         }
 
     }
