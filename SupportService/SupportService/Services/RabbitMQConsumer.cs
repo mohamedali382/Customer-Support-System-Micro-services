@@ -34,7 +34,20 @@ public class RabbitMQConsumer : BackgroundService
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
-        await InitializeAsync(stoppingToken);
+        while (!stoppingToken.IsCancellationRequested)
+        {
+            try
+            {
+                await InitializeAsync(stoppingToken);
+                break;
+            }
+            catch (Exception ex) when (!stoppingToken.IsCancellationRequested)
+            {
+                _logger.LogWarning(ex, "RabbitMQ not ready, retrying in 5s...");
+                await Task.Delay(5000, stoppingToken);
+            }
+        }
+
         await Task.Delay(Timeout.Infinite, stoppingToken);
     }
 

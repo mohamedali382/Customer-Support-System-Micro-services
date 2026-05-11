@@ -10,3 +10,11 @@ obj/
 
 # Logs
 *.log
+
+# Environment secret files — never commit these
+.env
+.env.dev
+.env.staging
+.env.prod
+API_DOCUMENTATION.md
+PROGRESS.md

@@ -37,6 +37,11 @@ namespace SupportService.Services
             return agent is null ? null : MapAgent(agent);
         }
 
+        public async Task<AgentResponse?> GetByUserIdAsync(string userId)
+        {
+            var agent = await _context.Agents.FirstOrDefaultAsync(a => a.UserId == userId);
+            return agent is null ? null : MapAgent(agent);
+        }
 
         public async Task<AgentResponse> CreateAsync(CreateAgentRequest request)
         {
@@ -45,6 +50,7 @@ namespace SupportService.Services
 
             var agent = new Agent
             {
+                UserId = request.UserId,
                 Name = request.Name,
                 Email = request.Email,
                 PhoneNumber = request.PhoneNumber,
@@ -111,7 +117,7 @@ namespace SupportService.Services
         }
 
         private static AgentResponse MapAgent(Agent a) => new(
-            a.Id, a.Name, a.Email, a.PhoneNumber,
+            a.Id, a.UserId, a.Name, a.Email, a.PhoneNumber,
             a.Department, a.Status.ToString(), a.CreatedAt, a.UpdatedAt);
     }
 }

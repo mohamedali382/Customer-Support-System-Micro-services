@@ -65,11 +65,19 @@ builder.Services
 
 builder.Services.AddAuthorization();
 
+builder.Services.AddCors(options =>
+{
+    options.AddPolicy("AllowAll", policy =>
+    {
+        policy.AllowAnyOrigin()
+              .AllowAnyHeader()
+              .AllowAnyMethod();
+    });
+});
 
 var app = builder.Build();
 
-
-app.UseHttpsRedirection();
+app.UseCors("AllowAll");
 
 app.UseAuthentication();
 
@@ -79,11 +87,13 @@ app.MapControllers();
 
 using (var scope = app.Services.CreateScope())
 {
-    var db =
-        scope.ServiceProvider
-            .GetRequiredService<AuthDbContext>();
-
-    db.Database.Migrate();
+    var db = scope.ServiceProvider.GetRequiredService<AuthDbContext>();
+    for (var retry = 0; retry < 5; retry++)
+    {
+        try { db.Database.Migrate(); break; }
+        catch (Microsoft.Data.SqlClient.SqlException) when (retry < 4)
+        { Thread.Sleep(3000); }
+    }
 }
 
 app.Run();

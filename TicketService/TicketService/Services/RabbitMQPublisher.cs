@@ -21,14 +21,28 @@ public class RabbitMQPublisher : IAsyncDisposable
     {
         var factory = new ConnectionFactory
         {
-            HostName = _config["RabbitMQ:HostName"] ?? "localhost",
+            HostName = _config["RabbitMQ:Host"] ?? "localhost",
             Port = int.Parse(_config["RabbitMQ:Port"] ?? "5672"),
             UserName = _config["RabbitMQ:UserName"] ?? "guest",
             Password = _config["RabbitMQ:Password"] ?? "guest",
         };
 
-        _connection = await factory.CreateConnectionAsync();
-        _channel = await _connection.CreateChannelAsync();
+        for (var retry = 0; retry < 5; retry++)
+        {
+            try
+            {
+                _connection = await factory.CreateConnectionAsync();
+                _channel = await _connection.CreateChannelAsync();
+                break;
+            }
+            catch (Exception) when (retry < 4)
+            {
+                await Task.Delay(3000);
+            }
+        }
+
+        if (_channel is null)
+            throw new InvalidOperationException("Failed to connect to RabbitMQ after 5 retries.");
 
         var exchange = _config["RabbitMQ:Exchange"] ?? "ticket.events";
 

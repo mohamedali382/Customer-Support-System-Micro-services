@@ -6,6 +6,7 @@ namespace SupportService.Services.Interfaces
     {
         Task<AgentListResponse> GetAllAsync(string? status);
         Task<AgentResponse?> GetByIdAsync(string id);
+        Task<AgentResponse?> GetByUserIdAsync(string userId);
         Task<AgentResponse> CreateAsync(CreateAgentRequest request);
         Task<AgentResponse?> UpdateAsync(string id, UpdateAgentRequest request);
         Task<bool> DeleteAsync(string id);

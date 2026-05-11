@@ -44,6 +44,16 @@ builder.Services
 
 builder.Services.AddAuthorization();
 
+builder.Services.AddCors(options =>
+{
+    options.AddPolicy("AllowAll", policy =>
+    {
+        policy.AllowAnyOrigin()
+              .AllowAnyHeader()
+              .AllowAnyMethod();
+    });
+});
+
 builder.Services.AddSingleton<RabbitMQPublisher>(sp =>
 {
     var config = sp.GetRequiredService<IConfiguration>();
@@ -56,10 +66,17 @@ builder.Services.AddScoped<IticketService, TicketService.Services.TicketService>
 
 var app = builder.Build();
 
+app.UseCors("AllowAll");
+
 using (var scope = app.Services.CreateScope())
 {
     var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-    db.Database.Migrate();
+    for (var retry = 0; retry < 5; retry++)
+    {
+        try { db.Database.Migrate(); break; }
+        catch (Microsoft.Data.SqlClient.SqlException) when (retry < 4)
+        { Thread.Sleep(3000); }
+    }
 }
 app.UseAuthentication();
 app.UseAuthorization();

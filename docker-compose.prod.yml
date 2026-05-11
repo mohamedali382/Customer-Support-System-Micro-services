@@ -1,0 +1,65 @@
+# Production environment overrides.
+# DB_PASSWORD, RABBITMQ_USER, and RABBITMQ_PASS MUST be set — no defaults here.
+# Usage:
+#   docker compose --env-file .env.prod -f docker-compose.yml -f docker-compose.prod.yml up -d
+#
+# After starting, verify running instances:
+#   docker compose --env-file .env.prod -f docker-compose.yml -f docker-compose.prod.yml ps
+
+services:
+  sqlserver:
+    environment:
+      SA_PASSWORD: "${DB_PASSWORD:?DB_PASSWORD must be set for production}"
+    healthcheck:
+      test: ["CMD", "/opt/mssql-tools18/bin/sqlcmd", "-S", "localhost", "-U", "sa",
+             "-P", "${DB_PASSWORD}", "-Q", "SELECT 1", "-No"]
+    volumes:
+      - sqlserver_prod_data:/var/opt/mssql
+
+  rabbitmq:
+    environment:
+      RABBITMQ_DEFAULT_USER: "${RABBITMQ_USER:?RABBITMQ_USER must be set for production}"
+      RABBITMQ_DEFAULT_PASS: "${RABBITMQ_PASS:?RABBITMQ_PASS must be set for production}"
+
+  identity-service:
+    ports:
+      - "5041:8080"
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Production
+      - ASPNETCORE_URLS=http://+:8080
+      - ConnectionStrings__DefaultConnection=Server=sqlserver;Database=UserServiceDb;User Id=sa;Password=${DB_PASSWORD};TrustServerCertificate=True
+      - Logging__LogLevel__Default=Warning
+
+  ticket-service:
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Production
+      - ASPNETCORE_URLS=http://+:8080
+      - ConnectionStrings__DefaultConnection=Server=sqlserver;Database=TicketServiceDb;User Id=sa;Password=${DB_PASSWORD};TrustServerCertificate=True
+      - RabbitMQ__Host=rabbitmq
+      - RabbitMQ__UserName=${RABBITMQ_USER}
+      - RabbitMQ__Password=${RABBITMQ_PASS}
+      - Logging__LogLevel__Default=Warning
+
+  support-service:
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Production
+      - ASPNETCORE_URLS=http://+:8080
+      - ConnectionStrings__DefaultConnection=Server=sqlserver;Database=SupportServiceDb;User Id=sa;Password=${DB_PASSWORD};TrustServerCertificate=True
+      - RabbitMQ__HostName=rabbitmq
+      - RabbitMQ__UserName=${RABBITMQ_USER}
+      - RabbitMQ__Password=${RABBITMQ_PASS}
+      - Services__TicketService=http://ticket-service:8080
+      - Logging__LogLevel__Default=Warning
+
+  notification-service:
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Production
+      - ASPNETCORE_URLS=http://+:8080
+      - ConnectionStrings__DefaultConnection=Server=sqlserver;Database=NotificationServiceDb;User Id=sa;Password=${DB_PASSWORD};TrustServerCertificate=True
+      - RabbitMQ__HostName=rabbitmq
+      - RabbitMQ__UserName=${RABBITMQ_USER}
+      - RabbitMQ__Password=${RABBITMQ_PASS}
+      - Logging__LogLevel__Default=Warning
+
+volumes:
+  sqlserver_prod_data:

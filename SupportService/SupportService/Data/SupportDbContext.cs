@@ -28,6 +28,7 @@ public class SupportDbContext : DbContext
             entity.Property(a => a.Status).HasConversion<string>();
             entity.HasIndex(a => a.Email).IsUnique();
             entity.HasIndex(a => a.Status);
+            entity.HasIndex(a => a.UserId);
         });
 
         modelBuilder.Entity<TicketAssignment>(entity =>

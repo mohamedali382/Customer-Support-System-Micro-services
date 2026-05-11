@@ -2,6 +2,7 @@
 {
     public record AgentResponse(
         string Id,
+        string UserId,
         string Name,
         string Email,
         string PhoneNumber,

@@ -1,0 +1,117 @@
+# Base configuration — shared by all environments.
+# Run with an environment overlay:
+#   docker compose -f docker-compose.yml -f docker-compose.dev.yml up --build
+#   docker compose -f docker-compose.yml -f docker-compose.staging.yml up --build
+#   docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
+
+services:
+
+  sqlserver:
+    image: mcr.microsoft.com/mssql/server:2022-latest
+    environment:
+      ACCEPT_EULA: "Y"
+      SA_PASSWORD: "${DB_PASSWORD:-Strong@Password123}"
+    volumes:
+      - sqlserver_data:/var/opt/mssql
+    healthcheck:
+      test: ["CMD", "/opt/mssql-tools18/bin/sqlcmd", "-S", "localhost", "-U", "sa",
+             "-P", "${DB_PASSWORD:-Strong@Password123}", "-Q", "SELECT 1", "-No"]
+      interval: 10s
+      retries: 10
+      start_period: 60s
+    networks:
+      - backend
+
+  rabbitmq:
+    image: rabbitmq:3-management
+    environment:
+      RABBITMQ_DEFAULT_USER: "${RABBITMQ_USER:-appuser}"
+      RABBITMQ_DEFAULT_PASS: "${RABBITMQ_PASS:-apppass}"
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "ping"]
+      interval: 10s
+      retries: 10
+      start_period: 30s
+    networks:
+      - backend
+
+  identity-service:
+    build:
+      context: .
+      dockerfile: IdentityService/Dockerfile
+    image: identity-service:latest
+    environment:
+      - ASPNETCORE_URLS=http://+:8080
+      - ConnectionStrings__DefaultConnection=Server=sqlserver;Database=UserServiceDb;User Id=sa;Password=${DB_PASSWORD:-Strong@Password123};TrustServerCertificate=True
+    depends_on:
+      sqlserver:
+        condition: service_healthy
+    networks:
+      - backend
+
+  ticket-service:
+    build:
+      context: .
+      dockerfile: TicketService/Dockerfile
+    image: ticket-service:latest
+    environment:
+      - ASPNETCORE_URLS=http://+:8080
+      - ConnectionStrings__DefaultConnection=Server=sqlserver;Database=TicketServiceDb;User Id=sa;Password=${DB_PASSWORD:-Strong@Password123};TrustServerCertificate=True
+      - RabbitMQ__Host=rabbitmq
+      - RabbitMQ__UserName=${RABBITMQ_USER:-appuser}
+      - RabbitMQ__Password=${RABBITMQ_PASS:-apppass}
+    depends_on:
+      sqlserver:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    networks:
+      - backend
+
+  support-service:
+    build:
+      context: .
+      dockerfile: SupportService/Dockerfile
+    image: support-service:latest
+    environment:
+      - ASPNETCORE_URLS=http://+:8080
+      - ConnectionStrings__DefaultConnection=Server=sqlserver;Database=SupportServiceDb;User Id=sa;Password=${DB_PASSWORD:-Strong@Password123};TrustServerCertificate=True
+      - RabbitMQ__HostName=rabbitmq
+      - RabbitMQ__UserName=${RABBITMQ_USER:-appuser}
+      - RabbitMQ__Password=${RABBITMQ_PASS:-apppass}
+      - Services__TicketService=http://ticket-service:8080
+    depends_on:
+      sqlserver:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+      ticket-service:
+        condition: service_started
+    networks:
+      - backend
+
+  notification-service:
+    build:
+      context: .
+      dockerfile: NotificationServiceAPI/Dockerfile
+    image: notification-service:latest
+    environment:
+      - ASPNETCORE_URLS=http://+:8080
+      - ConnectionStrings__DefaultConnection=Server=sqlserver;Database=NotificationServiceDb;User Id=sa;Password=${DB_PASSWORD:-Strong@Password123};TrustServerCertificate=True
+      - RabbitMQ__HostName=rabbitmq
+      - RabbitMQ__UserName=${RABBITMQ_USER:-appuser}
+      - RabbitMQ__Password=${RABBITMQ_PASS:-apppass}
+    depends_on:
+      sqlserver:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    networks:
+      - backend
+
+networks:
+  backend:
+    driver: bridge
+
+volumes:
+  sqlserver_data:

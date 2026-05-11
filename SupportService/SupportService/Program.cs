@@ -78,12 +78,29 @@ builder.Services.AddControllers()
 
 builder.Services.AddEndpointsApiExplorer();
 
+builder.Services.AddCors(options =>
+{
+    options.AddPolicy("AllowAll", policy =>
+    {
+        policy.AllowAnyOrigin()
+              .AllowAnyHeader()
+              .AllowAnyMethod();
+    });
+});
+
 var app = builder.Build();
+
+app.UseCors("AllowAll");
 
 using (var scope = app.Services.CreateScope())
 {
     var db = scope.ServiceProvider.GetRequiredService<SupportDbContext>();
-    db.Database.Migrate();
+    for (var retry = 0; retry < 5; retry++)
+    {
+        try { db.Database.Migrate(); break; }
+        catch (Microsoft.Data.SqlClient.SqlException) when (retry < 4)
+        { Thread.Sleep(3000); }
+    }
 }
 
 //app.UseHttpsRedirection();    

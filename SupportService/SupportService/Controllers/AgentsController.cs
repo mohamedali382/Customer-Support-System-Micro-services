@@ -32,6 +32,13 @@ namespace SupportService.Controllers
             return Ok(agent);
         }
 
+        [HttpGet("by-user/{userId}")]
+        public async Task<IActionResult> GetByUserId(string userId)
+        {
+            var agent = await _agentService.GetByUserIdAsync(userId);
+            return agent is null ? NotFound(new { message = $"No agent profile found for user {userId}." }) : Ok(agent);
+        }
+
         [HttpPost]
         //[Authorize(Roles = "Admin")]
         public async Task<IActionResult> Create([FromBody] CreateAgentRequest request)

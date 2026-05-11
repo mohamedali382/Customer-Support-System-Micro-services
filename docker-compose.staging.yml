@@ -1,0 +1,57 @@
+# Staging environment overrides.
+# Uses different ports (6xxx) so dev and staging can run simultaneously.
+# Usage:
+#   DB_PASSWORD=Staging@Pass456 docker compose -f docker-compose.yml -f docker-compose.staging.yml up --build
+
+services:
+
+  sqlserver:
+    environment:
+      SA_PASSWORD: "${DB_PASSWORD:-Staging@Pass456}"
+    healthcheck:
+      test: ["CMD", "/opt/mssql-tools18/bin/sqlcmd", "-S", "localhost", "-U", "sa",
+             "-P", "${DB_PASSWORD:-Staging@Pass456}", "-Q", "SELECT 1", "-No"]
+    ports:
+      - "1434:1433"
+    volumes:
+      - sqlserver_staging_data:/var/opt/mssql
+
+  rabbitmq:
+    ports:
+      - "5673:5672"
+      - "15673:15672"
+
+  identity-service:
+    ports:
+      - "6041:8080"
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Staging
+      - ASPNETCORE_URLS=http://+:8080
+      - ConnectionStrings__DefaultConnection=Server=sqlserver;Database=Staging_UserServiceDb;User Id=sa;Password=${DB_PASSWORD:-Staging@Pass456};TrustServerCertificate=True
+
+  ticket-service:
+    ports:
+      - "6006:8080"
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Staging
+      - ASPNETCORE_URLS=http://+:8080
+      - ConnectionStrings__DefaultConnection=Server=sqlserver;Database=Staging_TicketServiceDb;User Id=sa;Password=${DB_PASSWORD:-Staging@Pass456};TrustServerCertificate=True
+
+  support-service:
+    ports:
+      - "6274:8080"
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Staging
+      - ASPNETCORE_URLS=http://+:8080
+      - ConnectionStrings__DefaultConnection=Server=sqlserver;Database=Staging_SupportServiceDb;User Id=sa;Password=${DB_PASSWORD:-Staging@Pass456};TrustServerCertificate=True
+
+  notification-service:
+    ports:
+      - "6284:8080"
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Staging
+      - ASPNETCORE_URLS=http://+:8080
+      - ConnectionStrings__DefaultConnection=Server=sqlserver;Database=Staging_NotificationServiceDb;User Id=sa;Password=${DB_PASSWORD:-Staging@Pass456};TrustServerCertificate=True
+
+volumes:
+  sqlserver_staging_data:

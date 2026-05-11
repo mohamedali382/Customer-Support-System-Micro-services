@@ -78,7 +78,12 @@ app.MapControllers();
 using (var scope = app.Services.CreateScope())
 {
     var db = scope.ServiceProvider.GetRequiredService<NotificationDbContext>();
-    db.Database.Migrate();
+    for (var retry = 0; retry < 5; retry++)
+    {
+        try { db.Database.Migrate(); break; }
+        catch (Microsoft.Data.SqlClient.SqlException) when (retry < 4)
+        { Thread.Sleep(3000); }
+    }
 }
 
 app.Run();
