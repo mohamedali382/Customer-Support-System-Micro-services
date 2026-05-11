@@ -1,44 +1,26 @@
 apiVersion: v1
-kind: Service
+kind: PersistentVolumeClaim
 metadata:
-  name: sqlserver-headless
+  name: sqlserver-pvc
   namespace: customer-support
-  labels:
-    app: sqlserver
 spec:
-  clusterIP: None
-  selector:
-    app: sqlserver
-  ports:
-    - port: 1433
-      targetPort: 1433
----
-apiVersion: v1
-kind: Service
-metadata:
-  name: sqlserver
-  namespace: customer-support
-  labels:
-    app: sqlserver
-spec:
-  selector:
-    app: sqlserver
-  ports:
-    - port: 1433
-      targetPort: 1433
-  type: ClusterIP
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 2Gi
 ---
 apiVersion: apps/v1
-kind: StatefulSet
+kind: Deployment
 metadata:
   name: sqlserver
   namespace: customer-support
   labels:
     app: sqlserver
-    type: stateful
 spec:
-  serviceName: sqlserver-headless
   replicas: 1
+  strategy:
+    type: Recreate
   selector:
     matchLabels:
       app: sqlserver
@@ -46,7 +28,6 @@ spec:
     metadata:
       labels:
         app: sqlserver
-        type: stateful
     spec:
       containers:
         - name: sqlserver
@@ -83,12 +64,22 @@ spec:
             initialDelaySeconds: 60
             periodSeconds: 10
             failureThreshold: 10
-  volumeClaimTemplates:
-    - metadata:
-        name: sqlserver-storage
-      spec:
-        accessModes:
-          - ReadWriteOnce
-        resources:
-          requests:
-            storage: 2Gi
+      volumes:
+        - name: sqlserver-storage
+          persistentVolumeClaim:
+            claimName: sqlserver-pvc
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: sqlserver
+  namespace: customer-support
+  labels:
+    app: sqlserver
+spec:
+  selector:
+    app: sqlserver
+  ports:
+    - port: 1433
+      targetPort: 1433
+  type: ClusterIP
